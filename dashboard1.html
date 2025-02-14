@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Dashboard</h2>
+        <p>Logged in as: <span id="loggedInUser"></span></p>
+
+        <label for="reportType">Select Report:</label>
+        <select id="reportType">
+            <option value="weekly">Weekly</option>
+            <option value="monthly" selected>Monthly</option>
+            <option value="yearly">Yearly</option>
+        </select>
+        <button onclick="updateDashboard()">Generate Report</button>
+
+        <h3>Expense Summary</h3>
+        <p><strong>Total Expenses:</strong> ₹<span id="totalExpense">0</span></p>
+
+        <h3>Expenses by Category</h3>
+        <canvas id="categoryChart"></canvas>
+
+        <h3>Expenses Over Time</h3>
+        <canvas id="dateChart"></canvas>
+
+        <button onclick="window.location.href='add-expense.html'">Add More Expenses</button>
+        <button id="logout">Logout</button>
+    </div>
+
+    <script>
+        let currentUser = localStorage.getItem("loggedInUser");
+        if (!currentUser) {
+            alert("You must log in first!");
+            window.location.href = "login.html";
+        }
+        document.getElementById("loggedInUser").innerText = currentUser;
+
+        function updateDashboard() {
+            let reportType = document.getElementById("reportType").value;
+            let expenses = JSON.parse(localStorage.getItem(`expenses_${currentUser}`)) || [];
+            let totalExpense = 0;
+            let today = new Date();
+            let filteredExpenses = [];
+            let categoryData = {};
+            let dateData = {};
+
+            expenses.forEach(expense => {
+                let expenseDate = new Date(expense.date);
+                let daysDiff = (today - expenseDate) / (1000 * 60 * 60 * 24);
+                let includeExpense = false;
+
+                if (reportType === "weekly" && daysDiff <= 7) includeExpense = true;
+                else if (reportType === "monthly" && expenseDate.getMonth() === today.getMonth()) includeExpense = true;
+                else if (reportType === "yearly" && expenseDate.getFullYear() === today.getFullYear()) includeExpense = true;
+
+                if (includeExpense) {
+                    totalExpense += parseFloat(expense.amount);
+                    filteredExpenses.push(expense);
+
+                    categoryData[expense.category] = (categoryData[expense.category] || 0) + parseFloat(expense.amount);
+                    let formattedDate = expense.date;
+                    dateData[formattedDate] = (dateData[formattedDate] || 0) + parseFloat(expense.amount);
+                }
+            });
+
+            document.getElementById("totalExpense").innerText = totalExpense;
+            console.log("Category Data:", categoryData);
+            console.log("Date Data:", dateData);
+
+            generatePieChart(categoryData);
+            generateBarChart(dateData);
+        }
+
+        function generatePieChart(categoryData) {
+            let ctx = document.getElementById("categoryChart").getContext("2d");
+            if (window.categoryChart) window.categoryChart.destroy();
+            window.categoryChart = new Chart(ctx, {
+                type: "pie",
+                data: {
+                    labels: Object.keys(categoryData),
+                    datasets: [{
+                        data: Object.values(categoryData),
+                        backgroundColor: ["#ff6384", "#36a2eb", "#ffcd56", "#4bc0c0"]
+                    }]
+                }
+            });
+        }
+
+        function generateBarChart(dateData) {
+            let ctx = document.getElementById("dateChart").getContext("2d");
+            if (window.dateChart) window.dateChart.destroy();
+            window.dateChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: Object.keys(dateData),
+                    datasets: [{
+                        label: "Expenses",
+                        data: Object.values(dateData),
+                        backgroundColor: "#36a2eb"
+                    }]
+                }
+            });
+        }
+
+        document.getElementById("logout").addEventListener("click", function() {
+            localStorage.removeItem("loggedInUser");
+            alert("Logged out successfully!");
+            window.location.href = "login.html";
+        });
+
+        updateDashboard();
+    </script>
+</body>
+</html>
